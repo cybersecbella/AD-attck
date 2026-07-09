@@ -1,0 +1,147 @@
+"""
+Phase 3 test suite for the correlation engine.
+
+This is the first test that pulls together fixtures from all three
+prior phases into one coherent scenario:
+  - BloodHound path fixture: bob --GenericAll--> helpdesk_svc --MemberOf--> DOMAIN ADMINS
+  - Kerberoasting event fixture: helpdesk_svc had an RC4 (weak) TGS-REQ
+  - DCSync event fixture: helpdesk_svc performed DS-Replication-Get-Changes[-All]
+  - LDAP fixture: helpdesk_svc has msDS-SupportedEncryptionTypes=4 (RC4-only)
+
+Same account, same domain, three different data sources -- this is
+exactly the "attack path AND active exploitation" narrative the
+platform is meant to surface.
+
+Run with:
+    python -m pytest tests/test_correlator.py -v
+"""
+
+import json
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from bloodhound_client.models import parse_path_response
+from kerberoast_detector.spn_enum import parse_ldap_entry
+from log_correlation.parser import parse_event_xml
+from log_correlation.correlator import (
+    normalize_account_name,
+    correlate_kerberoastable_accounts,
+    correlate_log_events,
+    correlate_all,
+)
+
+from tests.fixtures.sample_ldap_entries import ENTRY_RC4_ONLY, ENTRY_AES_ONLY
+from tests.fixtures.sample_events import EVENT_4769_RC4, EVENT_4662_DCSYNC, EVENT_4769_AES
+
+FIXTURE_PATH = os.path.join(
+    os.path.dirname(__file__), "fixtures", "sample_path_response.json"
+)
+
+
+def load_paths():
+    with open(FIXTURE_PATH) as f:
+        return parse_path_response(json.load(f))
+
+
+# --- normalize_account_name --------------------------------------------
+
+def test_normalize_strips_domain_suffix():
+    assert normalize_account_name("helpdesk_svc@PHANTOM.CORP") == "helpdesk_svc"
+    assert normalize_account_name("HELPDESK_SVC@phantom.corp") == "helpdesk_svc"
+    assert normalize_account_name("helpdesk_svc") == "helpdesk_svc"
+    assert normalize_account_name("") == ""
+
+
+# --- correlate_kerberoastable_accounts ----------------------------------
+
+def test_kerberoastable_account_on_path_is_flagged():
+    paths = load_paths()
+    account = parse_ldap_entry(ENTRY_RC4_ONLY)  # helpdesk_svc, RC4-only
+
+    results = correlate_kerberoastable_accounts(paths, [account])
+
+    assert len(results) == 1
+    assert results[0].account == "helpdesk_svc"
+    assert results[0].evidence_type == "kerberoastable_on_path"
+    assert results[0].severity_boost == 5
+
+
+def test_safe_account_not_on_path_is_not_flagged():
+    paths = load_paths()
+    account = parse_ldap_entry(ENTRY_AES_ONLY)  # web_frontend_svc, AES-only, not in path fixture
+
+    results = correlate_kerberoastable_accounts(paths, [account])
+
+    assert len(results) == 0
+
+
+# --- correlate_log_events -----------------------------------------------
+
+def test_active_kerberoast_on_path_is_flagged():
+    paths = load_paths()
+    events = [parse_event_xml(EVENT_4769_RC4)]  # helpdesk_svc, RC4
+
+    results = correlate_log_events(paths, events)
+
+    assert len(results) == 1
+    assert results[0].account == "helpdesk_svc"
+    assert results[0].evidence_type == "active_kerberoast_on_path"
+    assert results[0].severity_boost == 15
+
+
+def test_active_dcsync_on_path_is_flagged():
+    paths = load_paths()
+    events = [parse_event_xml(EVENT_4662_DCSYNC)]  # helpdesk_svc, DCSync rights
+
+    results = correlate_log_events(paths, events)
+
+    assert len(results) == 1
+    assert results[0].account == "helpdesk_svc"
+    assert results[0].evidence_type == "active_dcsync_on_path"
+    assert results[0].severity_boost == 25
+
+
+def test_aes_kerberoast_event_not_flagged_even_if_on_path():
+    # AES ticket requests aren't a Kerberoasting indicator -- should not
+    # generate a correlation hit even for an in-path account.
+    paths = load_paths()
+    events = [parse_event_xml(EVENT_4769_AES)]  # web_frontend_svc, AES -- not weak, not on path either
+
+    results = correlate_log_events(paths, events)
+
+    assert len(results) == 0
+
+
+# --- correlate_all: the full worked scenario ----------------------------
+
+def test_full_scenario_surfaces_and_ranks_all_evidence():
+    paths = load_paths()
+    kerberoastable_accounts = [parse_ldap_entry(ENTRY_RC4_ONLY)]
+    raw_events = [
+        parse_event_xml(EVENT_4769_RC4),
+        parse_event_xml(EVENT_4662_DCSYNC),
+    ]
+
+    results = correlate_all(paths, kerberoastable_accounts, raw_events)
+
+    assert len(results) == 3
+
+    # Sorted by severity_boost descending: DCSync(25) > active kerberoast(15) > roastable-on-path(5)
+    assert results[0].evidence_type == "active_dcsync_on_path"
+    assert results[1].evidence_type == "active_kerberoast_on_path"
+    assert results[2].evidence_type == "kerberoastable_on_path"
+
+    assert all(r.account == "helpdesk_svc" for r in results)
+
+
+if __name__ == "__main__":
+    test_normalize_strips_domain_suffix()
+    test_kerberoastable_account_on_path_is_flagged()
+    test_safe_account_not_on_path_is_not_flagged()
+    test_active_kerberoast_on_path_is_flagged()
+    test_active_dcsync_on_path_is_flagged()
+    test_aes_kerberoast_event_not_flagged_even_if_on_path()
+    test_full_scenario_surfaces_and_ranks_all_evidence()
+    print("All Phase 3 correlator tests passed.")

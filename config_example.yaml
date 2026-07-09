@@ -1,0 +1,23 @@
+
+claude:
+  api_key: "YOUR_API_KEY"
+  model: "claude-sonnet-5"
+bloodhound:
+  # BloodHound CE (recommended) — generate a token in the BloodHound CE UI
+  # under Settings > API Keys.
+  api_id: "YOUR_BLOODHOUND_API_ID"
+  api_key: "YOUR_BLOODHOUND_API_KEY"  
+  base_url: "http://localhost:8080"
+
+  # Legacy BloodHound (only if not using CE) — uncomment and use instead:
+  # neo4j_uri: "bolt://localhost:7687"
+  # neo4j_user: "neo4j"
+  # neo4j_password: "REPLACE_ME"
+
+domain:
+  ldap_server: "REPLACE_ME"       # e.g. 10.10.10.5 or dc01.lab.local
+  username: "REPLACE_ME"          # low-privilege lab account, read-only is enough
+  password: "REPLACE_ME"
+
+logging:
+  level: "INFO"

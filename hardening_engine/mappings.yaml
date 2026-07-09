@@ -1,0 +1,92 @@
+# Maps BloodHound edge kinds and correlator evidence types to concrete
+# hardening recommendations. This is intentionally a flat, human-editable
+# mapping rather than a rules engine -- easy to extend as new edge types
+# or attack patterns come up.
+
+edge_recommendations:
+  GenericAll: >
+    Remove or scope down the GenericAll ACE to least privilege.
+    If the grantee genuinely needs delegated control, replace it with
+    a narrower right (e.g. ForceChangePassword only). Add the target
+    to Tier Zero monitoring if it isn't already.
+  GenericWrite: >
+    Audit what GenericWrite is actually used for on this object;
+    it's broad enough to allow SPN injection (enabling Kerberoasting
+    against a target that wasn't previously roastable) or Shadow
+    Credentials attacks. Scope down to specific attribute writes.
+  WriteDacl: >
+    WriteDacl allows the grantee to rewrite the object's permissions
+    entirely, effectively granting any right they want later. Remove
+    unless there's a hard operational requirement, and enable auditing
+    on ACL changes (Event ID 4670) for this object.
+  WriteOwner: >
+    WriteOwner lets the grantee take ownership and then grant themselves
+    WriteDacl. Treat with the same urgency as WriteDacl itself.
+  Owns: >
+    Review why this principal owns the object. Ownership implicitly
+    grants WriteDacl rights. Transfer ownership to a Tier Zero-controlled
+    account if this object is sensitive.
+  ForceChangePassword: >
+    Restrict ForceChangePassword rights to designated, tiered helpdesk
+    accounts only. This right is commonly over-granted during initial
+    AD setup and rarely re-audited.
+  AddMember: >
+    Restrict group membership management rights, especially into
+    privileged groups. Monitor Event IDs 4728/4732 (member added to
+    security-enabled group) for unexpected changes.
+  AllExtendedRights: >
+    This is a broad grant that can include password reset and Shadow
+    Credentials (msDS-KeyCredentialLink) abuse. Audit and scope down to
+    the specific extended right actually needed.
+  MemberOf: >
+    Review group nesting for unintended privilege escalation paths.
+    Deep or unexpected nesting into privileged groups is a common way
+    attack paths form without anyone explicitly granting access.
+  AdminTo: >
+    Remove unnecessary local admin rights on this host. Deploy LAPS
+    (Local Administrator Password Solution) so local admin credentials
+    are unique per-host and rotated automatically.
+  HasSession: >
+    Reduce standing sessions from privileged accounts on non-Tier-0
+    hosts. Cached credentials from these sessions are a common lateral
+    movement vector (Pass-the-Hash, token theft).
+  CanRDP: >
+    Restrict direct RDP access from user-tier workstations to
+    privileged-tier hosts. Route access through a Privileged Access
+    Workstation (PAW) or jump host instead.
+  SQLAdmin: >
+    Review the privilege level of the account running SQL Server. It
+    should not run as a domain-privileged account; use a scoped gMSA
+    instead.
+  ADCSESC1: >
+    This is a certificate template misconfiguration (ESC1) allowing
+    enrollees to specify an arbitrary SAN, enabling impersonation of any
+    principal. Remediate the template's enrollment permissions and
+    EDITF_ATTRIBUTESUBJECTALTNAME2 flag immediately -- this is a
+    high-severity, well-known escalation path.
+  ADCSESC4: >
+    This is a certificate template ACL misconfiguration (ESC4) allowing
+    the grantee to modify the template itself, effectively granting
+    them the ability to create an ESC1-style path on demand. Restrict
+    template write permissions to Tier Zero only.
+
+evidence_recommendations:
+  kerberoastable_on_path: >
+    This account is Kerberoastable and sits on a path to a privileged
+    target. Migrate it to a Group Managed Service Account (gMSA) where
+    possible, or at minimum enforce AES-only Kerberos encryption
+    (msDS-SupportedEncryptionTypes) and rotate its password to a long,
+    random value immediately.
+  active_kerberoast_on_path: >
+    ACTIVE EXPLOITATION INDICATOR: this account was observed requesting
+    a service ticket with weak (RC4/DES) encryption -- consistent with
+    an active Kerberoasting attempt. Rotate this account's credentials
+    immediately and investigate the source host/user that requested
+    the ticket.
+  active_dcsync_on_path: >
+    ACTIVE EXPLOITATION INDICATOR -- HIGH SEVERITY: this account was
+    observed exercising directory replication rights (DCSync) outside
+    of normal Domain Controller replication. Treat this as a confirmed
+    domain compromise: isolate the account, rotate the krbtgt account
+    password twice, rotate all privileged credentials, and begin
+    incident response procedures.

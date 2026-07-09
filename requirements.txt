@@ -1,0 +1,10 @@
+# Phase 1: BloodHound client + config
+requests>=2.31.0
+PyYAML>=6.0
+python-dotenv>=1.0.0
+
+# Phase 2+ (uncomment as needed)
+impacket>=0.11.0
+python-evtx>=0.7.4
+anthropic>=0.34.0
+neo4j>=5.20.0        # only if using legacy BloodHound (Bolt protocol) instead of BloodHound CE REST API

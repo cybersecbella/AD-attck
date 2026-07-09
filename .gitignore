@@ -1,0 +1,19 @@
+# Secrets
+config.yaml
+.env
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+
+# Output
+reports/*.json
+reports/*.md
+reports/*.pdf
+!reports/.gitkeep
+
+# OS
+.DS_Store

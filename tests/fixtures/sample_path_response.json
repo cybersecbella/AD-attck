@@ -1,0 +1,34 @@
+{
+  "_comment": "Static fixture modeled on BloodHound CE's /api/v2/graphs/cypher response shape for a shortest-path-to-DA query. Trimmed down for readability -- real responses include more node/edge properties. Used to test parsing logic without a live BloodHound instance.",
+  "data": {
+    "nodes": {
+      "1": {
+        "label": "bob@phantom.corp",
+        "kind": "User",
+        "objectId": "S-1-5-21-1111111111-2222222222-3333333333-1105"
+      },
+      "2": {
+        "label": "helpdesk_svc@phantom.corp",
+        "kind": "User",
+        "objectId": "S-1-5-21-1111111111-2222222222-3333333333-1210"
+      },
+      "3": {
+        "label": "DOMAIN ADMINS@PHANTOM.CORP",
+        "kind": "Group",
+        "objectId": "S-1-5-21-1111111111-2222222222-3333333333-512"
+      }
+    },
+    "edges": [
+      {
+        "source": "1",
+        "target": "2",
+        "kind": "GenericAll"
+      },
+      {
+        "source": "2",
+        "target": "3",
+        "kind": "MemberOf"
+      }
+    ]
+  }
+}

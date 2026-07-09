@@ -1,0 +1,108 @@
+"""
+Phase 4 test suite for narrator/prompts.py -- pure string-building
+logic, no API calls involved. claude_client.py itself isn't unit
+tested since it requires a real, billed API call; this covers
+everything it depends on.
+
+Run with:
+    python -m pytest tests/test_narrator_prompts.py -v
+"""
+
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from narrator.prompts import build_brief_prompt
+
+
+def test_prompt_includes_account_name():
+    prompt = build_brief_prompt(
+        account="helpdesk_svc",
+        evidence_type="active_dcsync_on_path",
+        edge_kinds=["GenericAll", "MemberOf"],
+        evidence={"subject_account": "helpdesk_svc", "full_dcsync_rights": True},
+        hardening_recs=["Rotate krbtgt twice.", "Isolate the account."],
+    )
+    assert "helpdesk_svc" in prompt
+
+
+def test_prompt_includes_all_four_required_sections():
+    prompt = build_brief_prompt(
+        account="helpdesk_svc",
+        evidence_type="kerberoastable_on_path",
+        edge_kinds=["GenericAll"],
+        evidence={},
+        hardening_recs=[],
+    )
+    assert "## Summary" in prompt
+    assert "## Business Risk" in prompt
+    assert "## Evidence of Exploitation" in prompt
+    assert "## Recommended Action" in prompt
+
+
+def test_prompt_maps_dcsync_to_critical_severity():
+    prompt = build_brief_prompt(
+        account="helpdesk_svc",
+        evidence_type="active_dcsync_on_path",
+        edge_kinds=[],
+        evidence={},
+        hardening_recs=[],
+    )
+    assert "CRITICAL" in prompt
+
+
+def test_prompt_maps_kerberoastable_to_medium_severity():
+    prompt = build_brief_prompt(
+        account="helpdesk_svc",
+        evidence_type="kerberoastable_on_path",
+        edge_kinds=[],
+        evidence={},
+        hardening_recs=[],
+    )
+    assert "MEDIUM" in prompt
+
+
+def test_prompt_handles_empty_hardening_recs_gracefully():
+    prompt = build_brief_prompt(
+        account="helpdesk_svc",
+        evidence_type="kerberoastable_on_path",
+        edge_kinds=["GenericAll"],
+        evidence={},
+        hardening_recs=[],
+    )
+    assert "None available." in prompt
+
+
+def test_prompt_includes_edge_chain_summary():
+    prompt = build_brief_prompt(
+        account="helpdesk_svc",
+        evidence_type="active_dcsync_on_path",
+        edge_kinds=["GenericAll", "MemberOf"],
+        evidence={},
+        hardening_recs=[],
+    )
+    assert "GenericAll -> MemberOf" in prompt
+
+
+def test_prompt_includes_evidence_key_value_pairs():
+    prompt = build_brief_prompt(
+        account="helpdesk_svc",
+        evidence_type="active_kerberoast_on_path",
+        edge_kinds=[],
+        evidence={"encryption_type": "0x17", "source_ip": "10.10.10.55"},
+        hardening_recs=[],
+    )
+    assert "encryption_type: 0x17" in prompt
+    assert "source_ip: 10.10.10.55" in prompt
+
+
+if __name__ == "__main__":
+    test_prompt_includes_account_name()
+    test_prompt_includes_all_four_required_sections()
+    test_prompt_maps_dcsync_to_critical_severity()
+    test_prompt_maps_kerberoastable_to_medium_severity()
+    test_prompt_handles_empty_hardening_recs_gracefully()
+    test_prompt_includes_edge_chain_summary()
+    test_prompt_includes_evidence_key_value_pairs()
+    print("All Phase 4 narrator prompt tests passed.")
