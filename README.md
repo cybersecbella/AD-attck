@@ -6,41 +6,77 @@ plain-English executive briefs + hardening recommendations via Claude.
 
 
 ad-attack-path-platform/
+
 ├── requirements.txt
+
 ├── config.yaml                    # domain, BloodHound API creds, Claude API key, log paths
+
 ├── README.md
+
 │
+
 ├── bloodhound_client/
+
 │   ├── __init__.py
+
 │   ├── api.py                     # auth + query wrapper for BloodHound API
+
 │   ├── queries.py                 # Cypher queries: top attack paths, shortest path to DA, etc.
+
 │   └── models.py                  # data classes for paths/nodes/edges
+
 │
+
 ├── kerberoast_detector/
+
 │   ├── __init__.py
+
 │   ├── spn_enum.py                # LDAP SPN enumeration (via impacket ldap3)
+
 │   └── weak_crypto.py             # flags msDS-SupportedEncryptionTypes = RC4/DES
+
 │
+
 ├── log_correlation/
+
 │   ├── __init__.py
+
 │   ├── parser.py                  # parses 4624/4625/4768/4769 (+ 4662 for DCSync)
+
 │   ├── evtx_reader.py             # local .evtx file support (offline/lab mode)
+
 │
+
 ├── narrator/
+
 │   ├── __init__.py
+
 │   ├── claude_client.py           # Anthropic API wrapper
+
 │   └── prompts.py                 # prompt templates for exec-brief generation
+
 │
+
 ├── hardening_engine/
+
 │   ├── __init__.py
+
 │   ├── rules.py                   # attack-pattern -> recommendation mapping
+
 │   └── mappings.yaml              # e.g. GenericAll on GPO -> tiering/ACL fix
+
 │
+
 ├── reports/
+
 │   └── (generated output: JSON + Markdown/PDF briefs)
+
 │
+
 ├── tests/
+
 │
+
 └── main.py                        # CLI entrypoint / orchestrator
 
 ## Setup
