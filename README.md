@@ -4,6 +4,7 @@ Ingests BloodHound attack-path data, correlates it with Windows event logs
 to detect active exploitation, flags Kerberoastable accounts, and generates
 plain-English executive briefs + hardening recommendations via Claude.
 
+For more info on Bloodhound and AD: https://www.cybersecbella.com/articles/ad_kerbo/ 
 
 ad-attack-path-platform/
 
